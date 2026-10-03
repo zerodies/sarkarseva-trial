@@ -254,6 +254,7 @@ a.card:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(20,30,70,.1)
         <p class="sub" style="margin-bottom:0">Log in to continue to Sarkar Seva</p>
         <div class="tabs"><button type="button" class="on" data-tab="mob">Mobile / Email</button><button type="button" data-tab="aad">Aadhaar</button></div>
         <label class="field"><span id="pre">+91</span><input id="id" autocomplete="username" placeholder="Mobile number or email" aria-label="Mobile number, email or Aadhaar"></label>
+        <div id="cf" style="margin:0 0 12px"></div>
         <p class="err" id="err" role="alert"></p>
         <button class="btn full" id="send">Send OTP</button>
         <div class="sep">or</div>
@@ -446,6 +447,7 @@ a.card:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(20,30,70,.1)
 
 <div class="toast" id="toast" role="status"></div>
 
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const P={
@@ -471,7 +473,7 @@ function go(id,back){
   if(!back)stack.push(id);
   document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
   scrollTo(0,0);
-  if(id==='s3')fillUser();if(id==='s12')renderList();
+  if(id==='s2')initCap();if(id==='s3')fillUser();if(id==='s12')renderList();
   if(id==='s7')runAgents();if(id==='s8')runExchange();if(id==='s9')later(()=>go('s10'),3500);
   if(id==='s10'&&cur&&!cur.saved){cur.saved=1;const d=new Date();$('done').textContent=d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})+' - '+fmt(d);
     api('POST','/requests/'+cur.id+'/complete',{id:cur.id,title:cur.title,date:fmt(d),status:'Completed'}).catch(()=>{})}
@@ -521,7 +523,7 @@ function runExchange(){
  Google:    Supabase dashboard > Authentication > Providers > Google. Add this page's URL to Auth > URL Configuration > Redirect URLs.
  Aadhaar OTP needs your own backend (UIDAI-authorised); it falls through to BACKEND_URL below.
  While the two Supabase values start with YOUR_, the app stays in demo mode (OTP 123456). */
-const CONFIG={SUPABASE_URL:'https://ciwhmfbpydwqfjmphzfc.supabase.co',SUPABASE_ANON_KEY:'sb_publishable_CWdbGlLgthJSWsIUXx_BWA_z8SNM7_l',BACKEND_URL:'/api'};
+const CONFIG={SUPABASE_URL:'https://ciwhmfbpydwqfjmphzfc.supabase.co',SUPABASE_ANON_KEY:'sb_publishable_CWdbGlLgthJSWsIUXx_BWA_z8SNM7_l',TURNSTILE_SITE_KEY:'YOUR_TURNSTILE_SITE_KEY',BACKEND_URL:'/api'};
 const sb=(window.supabase&&!CONFIG.SUPABASE_URL.startsWith('YOUR_'))?window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY):null;
 /* Suggested table for requests (not wired yet; requests still use the mock/BACKEND_URL):
    create table requests(id uuid primary key default gen_random_uuid(), user_id uuid default auth.uid(), ref text, title text, text text, status text default 'Processing', created_at timestamptz default now());
@@ -531,7 +533,7 @@ const API={base:CONFIG.BACKEND_URL,mock:true};
 async function sbAuth(path,b){
   const email=b.type==='email',phone='+91'+b.id;
   if(path==='/auth/otp/send'){
-    const {error}=await sb.auth.signInWithOtp(email?{email:b.id,options:{shouldCreateUser:true}}:{phone});
+    const o={captchaToken:b.captchaToken};const {error}=await sb.auth.signInWithOtp(email?{email:b.id,options:{shouldCreateUser:true,...o}}:{phone,options:o});
     if(error)throw error;return{ok:true}}
   if(path==='/auth/otp/verify'){
     const {data,error}=await sb.auth.verifyOtp(email?{email:b.id,token:b.otp,type:'email'}:{phone,token:b.otp,type:'sms'});
@@ -578,12 +580,12 @@ function parseId(){const v=$('id').value.trim(),d=v.replace(/\s/g,'');
 function startCd(){let n=30;clearInterval(cd);const r=$('resend');r.disabled=true;r.textContent='Resend OTP in 30s';
   cd=setInterval(()=>{n--;r.textContent=n>0?'Resend OTP in '+n+'s':'Resend OTP';r.disabled=n>0;if(n<=0)clearInterval(cd)},1000)}
 async function sendOtp(){const b=$('send');b.disabled=true;b.textContent='Sending...';
-  try{await api('POST','/auth/otp/send',pending);
+  try{await api('POST','/auth/otp/send',{...pending,captchaToken:cap()});
     $('sent').textContent=pending.type==='email'?pending.id[0]+'***@'+pending.id.split('@')[1]:pending.type==='aadhaar'?'your Aadhaar-linked mobile':'+91 ******'+pending.id.slice(-4);
     $('f1').hidden=true;$('f2').hidden=false;$('otp').value='';$('otp').focus();startCd()}
-  catch(e){$('err').textContent=e.message}finally{b.disabled=false;b.textContent='Send OTP'}}
-$('f1').onsubmit=e=>{e.preventDefault();const p=parseId();if(typeof p==='string')return $('err').textContent=p;$('err').textContent='';pending=p;sendOtp()};
-$('resend').onclick=()=>api('POST','/auth/otp/send',pending).then(()=>{startCd();toast('OTP sent again')}).catch(e=>toast(e.message));
+  catch(e){$('err').textContent=e.message}finally{capReset();b.disabled=false;b.textContent='Send OTP'}}
+$('f1').onsubmit=e=>{e.preventDefault();const p=parseId();if(typeof p==='string')return $('err').textContent=p;if(CAP&&!cap())return $('err').textContent='Complete the security check first.';$('err').textContent='';pending=p;sendOtp()};
+$('resend').onclick=()=>{if(CAP){$('chg').click();return toast('Complete the security check to resend.')}api('POST','/auth/otp/send',pending).then(()=>{startCd();toast('OTP sent again')}).catch(e=>toast(e.message))};
 $('chg').onclick=()=>{clearInterval(cd);$('f2').hidden=true;$('f1').hidden=false;$('err2').textContent=''};
 const signIn=r=>{localStorage.setItem('ss_session',JSON.stringify(r));go('s3')};
 $('f2').onsubmit=async e=>{e.preventDefault();const o=$('otp').value.trim();
@@ -594,6 +596,13 @@ $('goog').onclick=async()=>{try{signIn(await api('POST','/auth/google',{}))}catc
 $('out').onclick=()=>{if(sb)sb.auth.signOut();localStorage.removeItem('ss_session');stack=['s1'];go('s1',true)};
 if(sb)sb.auth.getSession().then(({data})=>{if(data.session&&!S()){localStorage.setItem('ss_session',JSON.stringify(sbSession(data.session)));go('s3')}});
 function fillUser(){const n=(S().user||{}).name||'there';$('who').textContent=n;$('uname').textContent=n;$('ini').textContent=n.slice(0,2).toUpperCase()}
+
+/* ===== CAPTCHA (Cloudflare Turnstile: public site key only; the secret key lives in Supabase) ===== */
+const CAP=!CONFIG.TURNSTILE_SITE_KEY.startsWith('YOUR_');let wid=null;
+function initCap(){if(CAP&&wid===null&&window.turnstile)wid=turnstile.render('#cf',{sitekey:CONFIG.TURNSTILE_SITE_KEY})}
+const cap=()=>CAP&&wid!==null?turnstile.getResponse(wid):undefined;
+const capReset=()=>{if(CAP&&wid!==null)turnstile.reset(wid)};
+addEventListener('load',initCap);
 
 /* ===== REQUESTS ===== */
 async function startReq(text){text=(text||'').trim();if(!text)return toast('Describe what you need first.');
