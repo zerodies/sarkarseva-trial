@@ -1,0 +1,8 @@
+{
+  "name": "sarkar-seva",
+  "private": true,
+  "dependencies": {
+    "pingram": "latest",
+    "standardwebhooks": "latest"
+  }
+}
