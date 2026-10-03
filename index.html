@@ -521,7 +521,7 @@ function runExchange(){
  Google:    Supabase dashboard > Authentication > Providers > Google. Add this page's URL to Auth > URL Configuration > Redirect URLs.
  Aadhaar OTP needs your own backend (UIDAI-authorised); it falls through to BACKEND_URL below.
  While the two Supabase values start with YOUR_, the app stays in demo mode (OTP 123456). */
-const CONFIG={SUPABASE_URL:'YOUR_SUPABASE_URL',SUPABASE_ANON_KEY:'YOUR_SUPABASE_ANON_KEY',BACKEND_URL:'/api'};
+const CONFIG={SUPABASE_URL:'https://ciwhmfbpydwqfjmphzfc.supabase.co',SUPABASE_ANON_KEY:'sb_publishable_CWdbGlLgthJSWsIUXx_BWA_z8SNM7_l',BACKEND_URL:'/api'};
 const sb=(window.supabase&&!CONFIG.SUPABASE_URL.startsWith('YOUR_'))?window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY):null;
 /* Suggested table for requests (not wired yet; requests still use the mock/BACKEND_URL):
    create table requests(id uuid primary key default gen_random_uuid(), user_id uuid default auth.uid(), ref text, title text, text text, status text default 'Processing', created_at timestamptz default now());
